@@ -19,12 +19,12 @@ along with asmttpd.  If not, see <http://www.gnu.org/licenses/>.
 all: main
 
 release: http.asm constants.asm bss.asm data.asm  macros.asm  main.asm  mutex.asm  string.asm  syscall.asm
-	yasm -f elf64 -a x86 main.asm -o main.o
+	nasm -f elf64 main.asm -o main.o
 	ld main.o -o asmttpd
 	strip -s asmttpd
 
 main.o: http.asm constants.asm bss.asm  data.asm  macros.asm  main.asm  mutex.asm  string.asm  syscall.asm
-	yasm -g dwarf2 -f elf64 -a x86 main.asm -o main.o
+	nasm -g -F dwarf -f elf64 -o main.o main.asm
 main: main.o
 	ld main.o -o asmttpd
 clean:

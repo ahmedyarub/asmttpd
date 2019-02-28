@@ -94,13 +94,26 @@ string_atoi: ; rdi = string, rax = int
     ret
 
 string_copy: ; rdi = dest, rsi = source, rdx = bytes to copy
-    stackpush
-    mov rcx, rdx
-    inc rcx ; to get null
-    cld
-    rep movsb 
-    stackpop
-    ret
+    push rdx
+	push rcx
+
+	inc rdx
+	xor eax, eax
+
+string_copy_loop:
+	cmp rax, rdx
+	je string_copy_return
+
+	mov cl, byte [rsi + rax]
+	mov byte [rdi + rax], cl
+
+	inc rax
+	jmp string_copy_loop
+
+string_copy_return:
+	pop rdx
+	pop rcx
+	ret
 
 string_concat_int: ;rdi = string being added to, rsi = int to add, ret: new length
     stackpush
@@ -116,11 +129,11 @@ string_concat_int: ;rdi = string being added to, rsi = int to add, ret: new leng
 
 string_concat: ;rdi = string being added to, rsi = string to add, ret: new length
     stackpush
-    
+
     call get_string_length
     add rdi, rax ; Go to end of string
     mov r10, rax
-    
+
     ;Get length of source ie. bytes to copy
     push rdi
     mov rdi, rsi
@@ -129,7 +142,7 @@ string_concat: ;rdi = string being added to, rsi = string to add, ret: new lengt
     mov rcx, rax
     add r10, rax
     pop rdi
-    
+
     rep movsb
 
     mov rax, r10
@@ -138,45 +151,54 @@ string_concat: ;rdi = string being added to, rsi = string to add, ret: new lengt
     ret
 
 string_contains: ;rdi = haystack, rsi = needle, ret = rax: location of string, else -1
-    stackpush
-    
-    xor r10, r10 ; total length from beginning
-    xor r8, r8 ; count from offset
+    push r9
+	push rdx
+	push rcx
+	push rdi
+	push r8
 
-    string_contains_start:
-    mov dl, BYTE [rdi]
-    cmp dl, 0x00
-    je string_contains_ret_no
-    cmp dl, BYTE [rsi]
-    je string_contains_check
-    inc rdi
-    inc r10 ; count from base ( total will be r10 + r8 )
-    jmp string_contains_start
+	xor r9d, r9d
+	xor edx, edx
 
-    string_contains_check:
-    inc r8 ; already checked at pos 0
-    cmp BYTE [rsi+r8], 0x00
-    je string_contains_ret_ok
-    mov dl, [rdi+r8]
-    cmp dl ,0x00
-    je string_contains_ret_no
-    cmp dl, [rsi+r8]
-    je string_contains_check
-    
-    inc rdi
-    inc r10
-    jmp string_contains_start
+string_contains_start:
+	mov cl, byte [rdi]
+	mov rax, r9
+	test cl, cl
+	je string_contains_returnOr
 
-    string_contains_ret_ok:
-    mov rax, r10
-    jmp string_contains_ret
+	cmp cl, byte [rsi]
 
-    string_contains_ret_no:
-    mov rax, -1
+string_contains_inner:
+	je string_contains_maybe
 
-    string_contains_ret:
-    stackpop
-    ret
+	inc r9
+	inc rdi
+	jmp string_contains_start
+
+string_contains_maybe:
+	inc rdx
+	movzx ecx, byte [rsi + rdx]
+	test cl, cl
+	je string_contains_return
+
+	movsx r8d, byte [rdi + rdx]
+
+	test r8b, r8b
+	je string_contains_returnOr
+
+	cmp r8d, ecx
+	jmp string_contains_inner
+
+string_contains_returnOr:
+	or rax, -1
+
+string_contains_return:
+	pop r8
+	pop rdi
+	pop rcx
+	pop rdx
+	pop r9
+	ret
 
 
 ;Removes first instance of string
@@ -187,7 +209,7 @@ string_remove: ;rdi = source, rsi = string to remove, ret = 1 for removed, 0 for
 
     call get_string_length
     mov r8, rax ;  r8: source length
-    cmp r8, 0 
+    cmp r8, 0
     mov rax, 0
     jle string_remove_ret ; source string empty?
 
@@ -201,17 +223,17 @@ string_remove: ;rdi = source, rsi = string to remove, ret = 1 for removed, 0 for
     jle string_remove_ret ; string to remove is blank?
 
     string_remove_start:
-    
+
     call string_contains
-    
+
     cmp rax,-1
     je string_remove_ret
-    
+
     ;Shift source string over
     add rdi, rax
     mov rsi, rdi
     add rsi, r10 ; copying to itself sans found string
-    
+
     cld
     string_remove_do_copy:
     lodsb
@@ -245,7 +267,7 @@ string_ends_with:;rdi = haystack, rsi = needle, ret = rax: 0 false, 1 true
 
     xor rax, rax
     xor rdx, rdx
-    
+
     string_ends_with_loop:
     ;Start from end, dec r10 till 0
     mov dl, BYTE [rdi]
@@ -286,41 +308,37 @@ print_line: ; rdi = pointer, rsi = length
     ret
 
 get_string_length: ; rdi = pointer, ret rax
-    stackpush
-    cld
-    mov r10, -1
-    mov rsi, rdi
-get_string_length_start:
-    inc r10 
-    lodsb
-    cmp al, 0x00
-    jne get_string_length_start
-    mov rax, r10
-    stackpop
+    mov rax, -1
+get_string_length_loop:
+    inc rax
+    cmp byte [rdi + rax], 0
+    jne get_string_length_loop
     ret
+
 
 get_number_of_digits: ; of rdi, ret rax
-    stackpush
-    push rbx
-    push rcx
-    
-    mov rax, rdi
-    mov rbx, 10
-    mov rcx, 1 ;count
-gnod_cont:
-    cmp rax, 10
-    jb gnod_ret
+	push rdi
+	push rsi
+	push rdx
+	push rcx
 
-    xor rdx,rdx
-    div rbx
+	mov rax, rdi
+	mov ecx, 1
+	mov esi, 10
 
-    inc rcx
-    jmp gnod_cont
-gnod_ret:
-    mov rax, rcx
-    
-    pop rcx
-    pop rbx
-    stackpop
-    ret
+get_number_of_digits_loop:
+	cmp rax, 9
+	jbe get_number_of_digits_return
 
+	xor edx, edx
+	div rsi
+	inc rcx
+	jmp get_number_of_digits_loop
+
+get_number_of_digits_return:
+	mov rax, rcx
+	pop rcx
+	pop rdx
+	pop rsi
+	pop rdi
+	ret

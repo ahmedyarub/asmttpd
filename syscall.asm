@@ -29,7 +29,7 @@ sys_cork:;rdi - socket
     stackpop
     ret
 
-sys_uncork;rdi - socket
+sys_uncork:;rdi - socket
     stackpush
     mov r10, one_constant ;pointer to 1
     mov r8, 8        ;sizeof int
@@ -40,7 +40,7 @@ sys_uncork;rdi - socket
     stackpop
     ret
 
-sys_reuse;rdi - socket
+sys_reuse:;rdi - socket
     stackpush
     mov r8, 8        ;sizeof int
     mov r10, one_constant      ;pointer to 1
